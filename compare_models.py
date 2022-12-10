@@ -112,8 +112,8 @@ def load_ref(name='ref'):
     with open(name + '.pkl', 'rb') as f:
         return pickle.load(f)
 
-mod2 = load_ref('ref_best')
+mod2 = load_ref('ref_freak')
 
-elo_new, _, mean_score = compare_models(mod, mod2, n_exp=500, ref=True)
+elo_new, _, mean_score = compare_models(mod, mod2, n_exp=400, ref=True, n_sim=10)
 
 print(mean_score)

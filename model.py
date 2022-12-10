@@ -15,8 +15,8 @@ class GameModel(nn.Module):
         super(GameModel, self).__init__()
         self.n_in = n_in
         self.n_action = n_action
-        self.n_fc1 = 256
-        self.n_fc2 = 128
+        self.n_fc1 = 512
+        self.n_fc2 = 256
         self.n_fc3 = 128
         self.fc1 = nn.Linear(n_in, self.n_fc1)
         self.relu1 = ReLU()
@@ -44,32 +44,37 @@ class GameModel(nn.Module):
 
 
 class ResModel(nn.Module):
-    def __init__(self, n_pix, n_action):
+    def __init__(self, n_pix, n_aux, n_action):
         super(ResModel, self).__init__()
         self.n_pix = n_pix
-        self.in_shape = (n_pix, n_pix, 2) 
+        self.n_aux = n_aux
+        self.in_shape = (n_pix, n_pix, 6) 
         self.n_action = n_action
         self.n_filters=32
+        self.conv_size = self.n_filters * self.n_pix ** 2
         self.conv_in = nn.Sequential(
-            nn.Conv2d(self.in_shape, self.n_filters, kernel_size=2, padding=1),
+            nn.Conv2d(self.in_shape, self.n_filters, kernel_size=3, padding=1),
             nn.BatchNorm2d(self.n_filters),
             nn.LeakyReLU()
         )
 
         # layers with residual
         self.conv_1 = nn.Sequential(
-            nn.Conv2d(self.n_filters, self.n_filters, kernel_size=2, padding=1),
+            nn.Conv2d(self.n_filters, self.n_filters, kernel_size=3, padding=1),
             nn.BatchNorm2d(self.n_filters),
             nn.LeakyReLU()
         )
         self.conv_2 = nn.Sequential(
-            nn.Conv2d(self.n_filters, self.n_filters, kernel_size=2, padding=1),
+            nn.Conv2d(self.n_filters, self.n_filters, kernel_size=3, padding=1),
             nn.BatchNorm2d(self.n_filters),
             nn.LeakyReLU()
         )
 
         self.flatten = nn.Flatten(start_dim=1)
-        self.p_head = nn.Linear(conv_policy_size, actions_n)
+        self.p_head = nn.Linear(self.conv_size + self.n_aux, actions_n)
+
+        self.pred = nn.Linear(self.conv_size + self.n_aux, 1)
+        self.tanh = Tanh()
 
 
     def forward(self, x, aux):
@@ -77,6 +82,7 @@ class ResModel(nn.Module):
         x = x + self.conv_1(x)
         x = x + self.conv_2(x)
         x = self.flatten(x)
+        x = torch.cat((x, aux), dim=1)
 
         p = self.p_head(x)
         x = self.pred(x)

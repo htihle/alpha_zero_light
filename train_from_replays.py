@@ -12,6 +12,13 @@ import game.game as game
 import model
 import glob 
 
+import sys
+sys.setrecursionlimit(10000)
+
+
+def load_ref(name='ref'):
+    with open(name + '.pkl', 'rb') as f:
+        return pickle.load(f)
 
 def get_feat_nn(state):
     my_map = state.return_maps()
@@ -49,36 +56,70 @@ def get_feat_nn(state):
     x[9 + len(summap1):] = summap1 / 5
     return x
 
-
 class Replays(Dataset):
+    def __init__(self, use_old_data=False):
+        if use_old_data:
+            replay_folder = 'replays_old/'
+            replay_files = glob.glob(replay_folder + "game_*.pkl", recursive=True) #[:2000]
+            replays = []
+            for filename in replay_files:
+                try:
+                    with open(filename, 'rb') as f:
+                        rep, vic = pickle.load(f)
+                    assert len(rep[0]) == 3, 'data missing in replay ' + filename
+                    replays.append([rep, vic])
+                except AssertionError:
+                    pass
+            print('number of games in dataset ', len(replays))
+            x = []
+            y = []
+            p = []
+            for replay in replays: 
+                rep, vic = replay
+                for i, r  in enumerate(rep):
+                    my_state, action, probs = r
+                    
+                    if i>0:  # the probs from previous turn was saved, so we did this to fix
+                        p.append(probs.flatten())
+                    if i < len(rep)-1:
+                        y.append(vic)
+                        x.append(get_feat_nn(my_state))
+        else:
+            replay_folder = 'replays_uni/'
+            replay_files_uni = glob.glob(replay_folder + "game_*.pkl", recursive=True) #[:2000]
 
-    def __init__(self, replay_folder):
-
-        replay_files = glob.glob(replay_folder + "game_*.pkl", recursive=True) #[:2000]
-        replays = []
-        for filename in replay_files:
-            try:
-                with open(filename, 'rb') as f:
-                    rep, vic = pickle.load(f)
-                assert len(rep[0]) == 3, 'data missing in replay ' + filename
-                replays.append([rep, vic])
-            except AssertionError:
-                pass
-        print('number of games in dataset ', len(replays))
-        x = []
-        y = []
-        p = []
-        for replay in replays: 
-            rep, vic = replay
-            for i, r  in enumerate(rep):
-                my_state, action, probs = r
-                
-                if i>0:  # the probs from previous turn was saved, so we did this to fix
-                    p.append(probs.flatten())
-                if i < len(rep)-1:
-                    y.append(vic)
-                    x.append(get_feat_nn(my_state))
-
+            replay_folder = '../alpha_zero/replays_uni/'
+            replay_files_uni1 = glob.glob(replay_folder + "game_*.pkl", recursive=True) #[:2000]
+            replay_folder = '../alpha_zero/replays_uni2/'
+            replay_files_uni2 = glob.glob(replay_folder + "game_*.pkl", recursive=True) #[:2000]
+            replay_folder = '../alpha_zero/replays_ref_best/'
+            replay_files_best1 = glob.glob(replay_folder + "game_*.pkl", recursive=True) #[:2000]
+            replay_folder = '../alpha_zero/replays_ref_best/'
+            replay_files_best2 = glob.glob(replay_folder + "game_*.pkl", recursive=True) #[:2000]
+            replay_files = replay_files_uni + replay_files_uni1 + replay_files_uni2 + replay_files_best1 + replay_files_best2
+            replays = []
+            for filename in replay_files:
+                try:
+                    with open(filename, 'rb') as f:
+                        rep, vic = pickle.load(f)
+                    assert len(rep[0]) == 3, 'data missing in replay ' + filename
+                    replays.append([rep, vic])
+                except AssertionError:
+                    pass
+            print('number of games in dataset ', len(replays))
+            x = []
+            y = []
+            p = []
+            for replay in replays: 
+                rep, vic = replay
+                for i, r  in enumerate(rep):
+                    my_state, action, probs = r
+                        
+                    if i < len(rep)-1:
+                        p.append(probs.flatten())
+                        y.append(vic)
+                        x.append(get_feat_nn(my_state))
+        
         assert len(x) == len(y), 'inconsistent length of data'
         self.n_samples = len(x)
         print('total number of positions in data ', self.n_samples)
@@ -86,23 +127,6 @@ class Replays(Dataset):
         self.y_data = torch.tensor(y, dtype=torch.float32)
         self.p_data = torch.tensor(p, dtype=torch.float32)
 
-
-        # imgs = np.load('all_img_cv2_time.npy', allow_pickle=True).astype(np.float32)
-        # mjds = np.load('all_mjd_cv2_time.npy', allow_pickle=True).astype(np.float32)
-        # imgs = imgs.transpose(0, 3, 1, 2)
-        # imgs /= 255.0
-        # # mjds = mjds % 1
-        # mjds = (mjds  - np.mean(mjds)) / 365 #% 1
-        # self.n_samples = imgs.shape[0]
-
-        # # here the first column is the class label, the rest are the features
-        # self.x_data = torch.from_numpy(imgs) # size [n_samples, n_features]
-        # self.y_data = torch.from_numpy(mjds) # size [n_samples, 1]
-
-        # dummy_y = np.mean(imgs, axis=(1, 2, 3))
-        # self.y_data = torch.from_numpy(dummy_y)
-
-        # self.transform = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     
     # support indexing such that dataset[i] can be used to get i-th sample
     def __getitem__(self, index):
@@ -111,6 +135,7 @@ class Replays(Dataset):
 
     def __len__(self):
         return self.n_samples
+
 
 
 # Check to see if we have a GPU to use for training
@@ -124,7 +149,7 @@ if device=='cuda':
 
 batch_size = 1024
 
-dataset = Replays('replays/')
+dataset = Replays()
 
 n_samp = len(dataset)
 n_train = int(n_samp * 0.7)
@@ -141,11 +166,13 @@ n_pix = 4
 
 n_feat = n_feat = 2 * n_pix ** 2 + 9
 
+# _, my_model = load_ref(name='ref_best')
+# _, my_model = load_ref(name='ref_replays_all_clean')
 my_model = model.GameModel(n_feat, n_action=4 * n_pix ** 2)
 
 lr = 0.001 #0.0005
 num_epochs = 100
-prior_weight = 10
+prior_weight = 2
 
 loss_fn = torch.nn.MSELoss()
 loss_p_fn = torch.nn.CrossEntropyLoss()
@@ -223,17 +250,13 @@ def test_epoch(my_model, device, dataloader, loss_fn, make_plot=False, prior_wei
         conc_y = torch.cat(conc_y)
         conc_p = torch.cat(conc_p)
         conc_p_out = torch.cat(conc_p_out)
-        # print(conc_out.shape)
-        # print(conc_y.shape)
-        # conc_mask = torch.cat(conc_mask)
         # Evaluate global loss
         val_loss = loss_fn(conc_out, conc_y) + prior_weight * loss_p_fn(conc_p_out, conc_p)
         # val_loss = loss_p_fn(conc_p_out, conc_p)
-        print(conc_y.detach().cpu().numpy())
-        print(conc_out.detach().cpu().numpy())
-        # print(np.sum((conc_y.detach().cpu().numpy() - conc_out.detach().cpu().numpy())**2))
+        idx = np.random.randint(0, len(conc_y.detach().cpu().numpy()), 10)
+        print(conc_y.detach().cpu().numpy()[idx])
+        print(conc_out.detach().cpu().numpy()[idx])
 
-        # plt.plot(np.abs(conc_y.detach().cpu().numpy() - conc_out.detach().cpu().numpy()), 'o')
         # plt.figure()
         if make_plot:
             plt.scatter(conc_y.detach().cpu().numpy(), conc_out.detach().cpu().numpy(), s=0.5)
@@ -261,9 +284,7 @@ for epoch in range(num_epochs):
     print('\n EPOCH {}/{} \t train loss {:.3f} \t val loss {:.3f}'.format(epoch + 1, num_epochs,train_loss,val_loss))
     history['train_loss'].append(train_loss)
     history['val_loss'].append(val_loss)
-#    if (epoch + 1) % 100 == 0:
-    # if ((epoch + 1) == num_epochs):
-    #     plot_ae_outputs(encoder,decoder,n=8)
+
 
 def save_ref(mod, name='ref'):
     with open(name + '.pkl', 'wb') as f:
@@ -296,7 +317,6 @@ def v3(state, net):
     return value, probs, x
 
 def compare_models(mod1, mod2, n_exp=100, ref=False, n_sim=20, temp=0.5):
-
     elo1, model1 = mod1
     elo2, model2 = mod2
     vic = np.zeros(n_exp)
@@ -332,13 +352,10 @@ def get_exp(e1, e2):
 
 mod = [1000, my_model]
 
-def load_ref(name='ref'):
-    with open(name + '.pkl', 'rb') as f:
-        return pickle.load(f)
 
-mod2 = load_ref('ref_best')
+mod2 = load_ref('ref_replays_all_clean')
 
-elo_new, _, mean_score = compare_models(mod, mod2, n_exp=500, ref=True)
+elo_new, _, mean_score = compare_models(mod, mod2, n_exp=200, ref=True, n_sim=10)
 
 print(mean_score)
 

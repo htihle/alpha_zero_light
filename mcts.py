@@ -27,12 +27,18 @@ class MCTS():
         self.Ns = {}  # number of times state s is visited
         self.Ps = {}  # policy in state s (also called priors)
 
-    def get_mcts_policy(self, state, net, n_sim=num_simulations, temp=1.0):
+    def get_mcts_policy(self, state, net, n_sim=num_simulations, temp=1.0, add_noise=True):
         state_str = state.state2string()
 
         for i in range(n_sim):
             # print(' ')
-            self.find_leaf_node(state, net, root=state_str)
+            try:
+                self.find_leaf_node(state, net, root=state_str, add_noise=add_noise, n_recur=1)
+            except RecursionError:
+                print('Encountered a recursion error')
+                i -= 1
+                continue
+            
 
         
 
@@ -55,9 +61,14 @@ class MCTS():
 
         return softmax_probs(counts, temp), best_value
     
-    def find_leaf_node(self, state, net, root):
+    def find_leaf_node(self, state, net, root, n_recur, add_noise=True):
+        
         
         state_str = state.state2string()
+        # print(n_recur)
+        if n_recur > 200:
+            print('High recurrence in mcts')
+            return 0.0
         # print(state_str)
         if state.done:
             # print('to play when done', state.to_play)
@@ -75,8 +86,7 @@ class MCTS():
             mask = state.invalid_action_mask()
             priors = priors.detach().numpy()
             priors = softmax(priors)
-            if state_str == root: 
-                priors = 0.75 * priors + 0.25 * np.random.dirichlet(0.5 * np.ones_like(priors))
+            
             priors = priors.reshape(n_pix, n_pix, 4)
             value = value.detach().numpy()
             ##### remove this
@@ -90,6 +100,8 @@ class MCTS():
                 print(mask, priors)
                 sys.exit()
             
+            if (state_str == root) and add_noise: 
+                policy[(mask==1)] = 0.75 * policy[(mask==1)] + 0.25 * np.random.dirichlet(0.5 * np.ones_like(policy[(mask==1)]))
             # print('value', value)
             self.Ps[state_str] = policy 
             self.Ns[state_str] = 0
@@ -116,7 +128,7 @@ class MCTS():
 
         new_s = copy.deepcopy(state)
         new_s.step([new_s.to_play, best_action[0], best_action[1], best_action[2]])
-        val = self.find_leaf_node(new_s, net, root=root)
+        val = self.find_leaf_node(new_s, net, root, n_recur+1)
         sa = state_str + ' ' + best_action_str
         if sa in self.Qsa:
             # print(sa, val, self.Qsa[sa])
