@@ -10,6 +10,7 @@ class State():
     def __init__(self, n_pix, players=None, randomize=False, rand_frac=0.9, to_play=0):
         self.to_play = to_play
         self.n_pix = n_pix
+        self.turn = 0
         self.done = False
         if players is None:
             self.players = [
@@ -80,7 +81,7 @@ class State():
         my_map = self.return_maps()
         summap = my_map[0][1] - my_map[1][1] + my_map[0][0] - my_map[1][0]
         st = ''
-        state_string = str(self.to_play) + ' ' + str(np.sum(my_map[0][3].flatten())) + ' ' + str(np.sum(my_map[1][3].flatten())) + ' ' + st.join([str(el) for el in summap])
+        state_string = str(self.turn) + ' '+ str(self.to_play) + ' ' + str(np.sum(my_map[0][3].flatten())) + ' ' + str(np.sum(my_map[1][3].flatten())) + ' ' + st.join([str(el) for el in summap])
         return state_string
 
     def step(self, action):
@@ -94,4 +95,5 @@ class State():
                     centre.work()
         
         self.to_play = 1 - self.to_play
+        self.turn += 1
         
