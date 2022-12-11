@@ -1,5 +1,5 @@
 import torch
-from torch import nn
+# from torch import nn
 import numpy as np
 import copy
 import os
@@ -85,9 +85,32 @@ def v2(state, net):
 
     return value, x
 
+
+def conv_features(state):
+    my_map = state.return_maps()
+
+    x_map = np.zeros((7, n_pix, n_pix))
+    x_map[0] = my_map[0][0]
+    x_map[1] = my_map[0][1]
+    x_map[2] = my_map[0][3]
+    x_map[3] = my_map[1][0]
+    x_map[4] = my_map[1][1]
+    x_map[5] = my_map[1][3]
+    x_map[6] = np.ones((n_pix, n_pix)) * state.to_play
+    return x_map
+
+
 def v3(state, net):
     x = get_feat_nn(state)
     x = torch.tensor(x, dtype=torch.float32)
+    value, probs = net(x)
+    if state.done:
+        value = state.victory
+    return value, probs, x
+
+def v_conv(state, net):
+    x = conv_features(state)
+    x = torch.tensor(x, dtype=torch.float32).unsqueeze(0)
     value, probs = net(x)
     if state.done:
         value = state.victory
@@ -97,17 +120,75 @@ def load_ref(name='ref'):
     with open(name + '.pkl', 'rb') as f:
         return pickle.load(f)
 
+def load_game(gameid, folder='replays'):
+    filename = folder + '/game_{0:d}'.format(gameid)
+    with open(filename + '.pkl', 'rb') as f:
+        return pickle.load(f)
+
+def view_replay(gameid, mod, folder='replays', sleeplen=1.5):
+    replay, victory = load_game(gameid, folder=folder)
+    elo, model, v = mod
+    n_turns = len(replay)
+    print(n_turns)
+    # print(replay[0])
+    print(len(replay))
+    p = 0
+    for state, action, _ in replay:
+        state.visualize()
+        print(action)
+        # x = get_feat_nn(state, action)
+        val, probs, _ = v(state, model)
+        print(val)
+        print(state.done)
+        p += 1
+        print(p)
+        sleep(sleeplen)
+    print(victory)
+
 n_pix = 4
 n_aux = 1
-my_game = game.Game(n_pix, q, v3, randomize=False, rand_frac=0.5)
+n_feat = n_feat = 2 * n_pix ** 2 + 9
+# elo, my_model = load_ref(name='ref_conv_2_alldata_lr015_100epoch')
+# mod = [elo, my_model, v_conv]
+# view_replay(220, mod, folder='comparisons')
+
+my_game = game.Game(n_pix, v_conv, v_conv, randomize=False, rand_frac=0.5)
 
 # my_model = model.GameModel(n_feat, n_action=4 * n_pix ** 2)
-elo, my_model = load_ref(name='ref_replays_all_clean')
+# elo, my_model = load_ref(name='ref_replays_all_clean')
+elo, my_model = load_ref(name='ref_conv_2_alldata_lr015_100epoch')
 
-res_model = model.ResModel(n_pix, n_aux, n_action=4 * n_pix ** 2)
+# my_model = model.ResModel(n_pix, n_action=4 * n_pix ** 2)
+my_game.vs_mcts(num_sim=350, net=my_model)
 
-print(len(my_model.parameters))
-print(len(res_model.parameters))
+# my_map = my_game.state.return_maps()
+# print(my_map[0][0])
+# x_map = np.zeros((7, n_pix, n_pix))
+# x_map[0] = my_map[0][0]
+# x_map[1] = my_map[0][1]
+# x_map[2] = my_map[0][3]
+# x_map[3] = my_map[1][0]
+# x_map[4] = my_map[1][1]
+# x_map[5] = my_map[1][3]
+# x_map[6] = np.ones((n_pix, n_pix)) * my_game.state.to_play
+# x_map = torch.tensor(x_map, dtype=torch.float32)
+# x_map = x_map.unsqueeze(0)
+# aux = torch.tensor([my_game.state.to_play], dtype=torch.float32).unsqueeze(0)
+# print(x_map)
+# print(aux)
+# value, probs = res_model(x_map)
+
+# print(value)
+# print(probs.reshape((4, 4, 4)))
+
+# value, probs, _ = v3(my_game.state, my_model)
+# print(value)
+# print(probs.reshape((4, 4, 4)))
+# # x = get_feat_nn(state)
+# # x = torch.tensor(x, dtype=torch.float32)
+
+# print(sum(p.numel() for p in my_model.parameters()))
+# print(sum(p.numel() for p in res_model.parameters()))
 
 # elo, my_model = load_ref(name='ref_replays_all_clean')
 # my_game.vs_mcts(num_sim=150, net=my_model)

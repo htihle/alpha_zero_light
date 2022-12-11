@@ -8,10 +8,11 @@ import mcts as my_mcts
 
 
 class Game():
-    def __init__(self, n_pix, q, v, state=None, randomize=False, rand_frac=0.9, max_turns=50, random_start=False):
+    def __init__(self, n_pix, v1, v2, state=None, randomize=False, rand_frac=0.9, max_turns=50, random_start=False):
         self.n_pix = n_pix
-        self.q = q
-        self.v = v
+        # self.q = q
+        self.v1 = v1
+        self.v2 = v2
         self.max_turns = max_turns
         if state is None:
             if random_start:
@@ -26,7 +27,7 @@ class Game():
         self.replay = []
 
     def vs_mcts(self, net, num_sim=100, sample=False):
-        mcts = my_mcts.MCTS(valuefunc=self.v)
+        mcts = my_mcts.MCTS(valuefunc=self.v1)
         walking = {
             "s": 0,
             "d": 1,
@@ -34,27 +35,52 @@ class Game():
             "a": 3,
         }
         while (not self.state.done):
+            print('Turn nr: ', self.turn)
             self.state.visualize()
             action = [0]
-            action.append(int(input('0 for cities, 1 for units: ')))
+            try:
+                my_input = int(input('0 for cities, 1 for units: '))
+                assert (my_input == 0) or (my_input == 1)
+            except AssertionError:
+                print('Wrong key, try again!')
+                my_input = int(input('0 for cities, 1 for units: '))
+            action.append(my_input)
             if (action[1] == 0):
                 print('You have %s resources' % self.state.players[0][0][0].res)
                 action.append(0)
-                action.append(int(input('0 for growth, 1 for unit: ')))
+                try:
+                    my_input = int(input('0 for growth, 1 for unit: '))
+                    assert (my_input == 0) or (my_input == 1)
+                except AssertionError:
+                    print('Wrong key, try again!')
+                    my_input = int(input('0 for growth, 1 for unit: '))
+                action.append(my_input)
+
             elif (action[1] == 1):
                 for i, unit in enumerate(self.state.players[action[0]][1]):
                     print('You have unit at (%i, %i) with size %i, this is unit %i in %i' % (
                         unit.position[0], unit.position[1], unit.size, i + 1, len(self.state.players[action[0]][1])))
-                    my_input = input('wasd to move or f to skip ')
-                    if (my_input == 'f'):
-                        pass
-                    else:
-                        action.append(i)
-                        action.append(walking[my_input])
-                        break
+                    
+                    try:
+                        my_input = input('wasd to move or f to skip ')
+                        if (my_input == 'f'):
+                            pass
+                        else:
+                            action.append(i)
+                            action.append(walking[my_input])
+                            break
+                    except KeyError:
+                        print('Wrong key, try again!')
+                        my_input = input('wasd to move or f to skip ')
+                        if (my_input == 'f'):
+                            pass
+                        else:
+                            action.append(i)
+                            action.append(walking[my_input])
+                            break
             self.replay.append([copy.deepcopy(self.state), action])
             self.state.step(action)
-
+            self.turn += 1
             mcts.clear()
 
             probs, best_val = mcts.get_mcts_policy(self.state, net, num_sim)
@@ -87,7 +113,8 @@ class Game():
             print(self.state.victory)
 
     def mcts_vs_mcts(self, net, net2, eps=0.0, sample=True, n_sim=150, save_game=True, temp=1.0, replay_folder='replays'):
-        mcts = my_mcts.MCTS(valuefunc=self.v)
+        mcts = my_mcts.MCTS(valuefunc=self.v1)
+        mcts2 = my_mcts.MCTS(valuefunc=self.v2)
         while (not self.state.done):
             #print(self.turn)
             #### first player
@@ -132,9 +159,9 @@ class Game():
                 break
             
             #### second player
-            mcts.clear()
+            mcts2.clear()
 
-            probs, best_val = mcts.get_mcts_policy(self.state, net2, n_sim=n_sim, temp=temp)  
+            probs, best_val = mcts2.get_mcts_policy(self.state, net2, n_sim=n_sim, temp=temp)  
             if np.random.rand() < eps:
                 i = np.random.randint(2)
                 if len(self.state.players[self.state.to_play][i]) > 0:

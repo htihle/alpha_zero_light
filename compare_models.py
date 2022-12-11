@@ -56,22 +56,47 @@ def v3(state, net):
         value = state.victory
     return value, probs, x
 
-def compare_models(mod1, mod2, n_exp=100, ref=False, n_sim=5, temp=0.5):
+def conv_features(state):
+    my_map = state.return_maps()
 
-    elo1, model1 = mod1
-    elo2, model2 = mod2
+    x_map = np.zeros((7, n_pix, n_pix))
+    x_map[0] = my_map[0][0]
+    x_map[1] = my_map[0][1]
+    x_map[2] = my_map[0][3]
+    x_map[3] = my_map[1][0]
+    x_map[4] = my_map[1][1]
+    x_map[5] = my_map[1][3]
+    x_map[6] = np.ones((n_pix, n_pix)) * state.to_play
+    return x_map
+
+
+def v_conv(state, net):
+    x = conv_features(state)
+    x = torch.tensor(x, dtype=torch.float32).unsqueeze(0)
+    value, probs = net(x)
+    if state.done:
+        value = state.victory
+    return value, probs, x
+
+def compare_models(mod1, mod2, n_exp=100, ref=False, n_sim=5, temp=0.5, replay_folder=None):
+    if replay_folder is not None:
+        save_game = True
+    else:
+        save_game = False
+    elo1, model1, v1 = mod1
+    elo2, model2, v2 = mod2
     vic = np.zeros(n_exp)
     K = 10
     eps = 0.1
     for i in range(n_exp):
         print('Playing game number: ', i + 1, ' of ', n_exp)
         if i < n_exp // 2:
-            gm = game.Game(n_pix, 1, v3, randomize=True, rand_frac=0.2)
-            gm.mcts_vs_mcts(model1, model2, eps=eps, n_sim=n_sim, save_game=False)
+            gm = game.Game(n_pix, v1, v2, randomize=True, rand_frac=0.2)
+            gm.mcts_vs_mcts(model1, model2, eps=eps, n_sim=n_sim, save_game=save_game, replay_folder=replay_folder)
             vic[i] = (gm.state.victory + 1) * 0.5
         else:
-            gm = game.Game(n_pix, 1, v3, randomize=True, rand_frac=0.2)
-            gm.mcts_vs_mcts(model2, model1, eps=eps, n_sim=n_sim, save_game=False)
+            gm = game.Game(n_pix, v2, v1, randomize=True, rand_frac=0.2)
+            gm.mcts_vs_mcts(model2, model1, eps=eps, n_sim=n_sim, save_game=save_game, replay_folder=replay_folder)
             vic[i] = 1 - (gm.state.victory + 1) * 0.5
         print('Mean score: ', np.mean(vic[:i+1]))
         exp1, exp2 = get_exp(elo1, elo2)
@@ -104,16 +129,16 @@ device = 'cpu'
 if device=='cuda':
   print (torch.cuda.get_device_name(device=device))
 
-mod = load_ref('ref_replays')
+mod = load_ref('ref_conv_15_alldata_lr02_512_100epoch_085')
 
-# mod = [1000, my_model]
+mod = [mod[0], mod[1], v_conv]
 
 def load_ref(name='ref'):
     with open(name + '.pkl', 'rb') as f:
         return pickle.load(f)
 
-mod2 = load_ref('ref_freak')
-
-elo_new, _, mean_score = compare_models(mod, mod2, n_exp=400, ref=True, n_sim=10)
-
-print(mean_score)
+# mod2 = load_ref('ref_freak')
+# mod2 = [mod2[0], mod2[1], v3]
+mod2 = load_ref('ref_conv_15_alldata_lr015_512_100epoch')
+mod2 = [mod2[0], mod2[1], v_conv]
+elo_new, _, mean_score = compare_models(mod, mod2, n_exp=200, ref=True, n_sim=5, replay_folder='comparisons')

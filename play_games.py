@@ -68,22 +68,19 @@ def load_ref(name='ref'):
 n_pix = 4
 eps = 0.0
 
-_, my_model = load_ref(name='ref_freak')
+_, my_model = load_ref(name='ref_replays_all_clean')
 
 n_games = 10000
 for i in range(n_games):
     my_game = game.Game(n_pix, q, v3, randomize=True, rand_frac=0.8, random_start=True)
     try:
-        my_game.mcts_vs_mcts(my_model, my_model, eps=eps, n_sim=150, replay_folder='freak2')
+        my_game.mcts_vs_mcts(my_model, my_model, eps=eps, n_sim=150, replay_folder='replays_clean2')
     except RecursionError:
         print('Encountered a recursion error')
         continue
-    # replay, victory, _ = load_game(gameid)
     replay = my_game.replay
     victory = my_game.state.victory
-    # print(my_game.state.victory)
-    # print(my_game.turn)
-    # print(len(replay))
+
     n_replay = len(replay) - 1
-    # victory = (victory + 1) * 0.5
+
     print('length of game: ', n_replay + 1, ' score: ', victory)

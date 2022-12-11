@@ -4,14 +4,11 @@ from scipy.special import softmax
 
 import torch
 
-n_pix = 4
+# n_pix = 4
+# priors_uni = np.zeros((n_pix, n_pix,  4)) + 1.0
 
-priors_uni = np.zeros((n_pix, n_pix,  4)) + 1.0
-# priors[1, 0, 2] = 100.0
 
 c_base = 1.0
-pb_c_init = 1.0
-num_simulations = 150
 
 class MCTS():
     def __init__(self, valuefunc):
@@ -27,7 +24,7 @@ class MCTS():
         self.Ns = {}  # number of times state s is visited
         self.Ps = {}  # policy in state s (also called priors)
 
-    def get_mcts_policy(self, state, net, n_sim=num_simulations, temp=1.0, add_noise=True):
+    def get_mcts_policy(self, state, net, n_sim=150, temp=1.0, add_noise=True):
         state_str = state.state2string()
 
         for i in range(n_sim):
@@ -65,13 +62,12 @@ class MCTS():
         
         
         state_str = state.state2string()
-        # print(n_recur)
+
         if n_recur > 200:
             print('High recurrence in mcts')
             return 0.0
-        # print(state_str)
         if state.done:
-            # print('to play when done', state.to_play)
+            # the loser has the turn (and we return - value)
             if state.to_play == 1:
                 return state.victory
             else:
@@ -87,9 +83,9 @@ class MCTS():
             priors = priors.detach().numpy()
             priors = softmax(priors)
             
-            priors = priors.reshape(n_pix, n_pix, 4)
+            priors = priors.reshape(state.n_pix, state.n_pix, 4)
             value = value.detach().numpy()
-            ##### remove this
+            ##### only for testing
             # priors = priors_uni
             #####
             policy = priors * mask

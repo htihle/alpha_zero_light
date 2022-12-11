@@ -122,45 +122,21 @@ def train_nn(net, optim, loss_fn, elo=0.0):
             # replay, victory, _ = load_game(gameid)
             replay = my_game.replay
             victory = my_game.state.victory
-            # print(my_game.state.victory)
-            # print(my_game.turn)
-            # print(len(replay))
+
             n_replay = len(replay) - 1
             lens[gameid] = n_replay
-            # victory = (victory + 1) * 0.5
+
             victories.append(victory)
             print('length of game: ', n_replay + 1, ' score: ', victory)
             for i in range(n_replay):
                 
                 state, action, probs = replay[i]
-                # state, action = replay[i]
+
                 x1 = get_feat_nn(state)
                 y.append(victory)
                 x.append(x1[:])
                 p.append(probs.flatten())
-                # if n_replay < 30:
-                #     y.append(victory)
-                #     x.append(x1[:])
-                # if state.done:
-                #     print('this should not happen')
-                #     sys.exit()
-                #     # v_pred[i] = (state.victory + 1) * 0.5
-                # else:
-                #     v_pred[i] = net(x1[None, :])
-                
 
-                # w += alpha * discount * (victory_local - val) * x
-                # discount = discount * 1.1
-            # print(gameid)
-            # print(w)
-            # v_out = state.victory #TD_lambda(v_pred)
-            # for i in range(n_replay):
-            #     # y.append(np.array([v_out[i]]))
-            #     y.append(v_out[i])
-                # accuracy.append(np.sqrt((v_out[i] - v_pred[i]) ** 2))
-        
-        # y = np.array(y)
-        # x = np.array(x)
         
         y = torch.tensor(y, dtype=torch.float32)
         x = torch.tensor(x, dtype=torch.float32)
@@ -176,11 +152,7 @@ def train_nn(net, optim, loss_fn, elo=0.0):
             optim.zero_grad()
             loss.backward()
             optim.step()
-        # training_data = list(zip(x, y))
-        # net = network.Network([len(x1), 50, 20, 1])
-        # net.SGD(training_data, 10, 20, 0.1)
-        # net.fit(x, y, epochs=10)
-        # print('Average error', np.array(accuracy).mean())
+
         print('Average result', np.array(victories).mean())
         print('Median game length: ', np.median(lens))
         filename = 'nn_3_0'
@@ -256,8 +228,8 @@ def load_ref(name='ref'):
 
 n_pix = 4
 n_feat = 2 * n_pix ** 2 + 9
-learning_rate = 0.00002 #0.0001
-#lr = 0.0005
+learning_rate = 0.0002 #0.0001
+
 # elo = 100
 # my_model = model.GameModel(n_feat, n_action=4 * n_pix ** 2)
 # elo, my_model = load_ref(name='ref_best')
@@ -283,24 +255,3 @@ for i in range(10):
 
 
     train_nn(my_model, optim, loss_fn, elo)
-
-
-
-
-# elo, model = load_ref(name='ref')
-# # mod = train_nn(model, elo=elo)
-# # save_ref(mod, name='ref')
-# # print("Elo: ", mod[0])
-
-# mod = [1000, model]
-
-# mod2 = load_ref('ref_1000')
-
-# print(compare_models(mod, mod2, n_exp=300, ref=True))
-# # save_ref(mod, name='ref_1000')
-
-# for i in range(1):
-#     view_replay(1, model)
-
-# # my_game = game.Game(n_pix, q)
-# # my_game.vs_ai(model)

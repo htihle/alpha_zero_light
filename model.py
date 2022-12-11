@@ -15,8 +15,8 @@ class GameModel(nn.Module):
         super(GameModel, self).__init__()
         self.n_in = n_in
         self.n_action = n_action
-        self.n_fc1 = 512
-        self.n_fc2 = 256
+        self.n_fc1 = 256
+        self.n_fc2 = 128
         self.n_fc3 = 128
         self.fc1 = nn.Linear(n_in, self.n_fc1)
         self.relu1 = ReLU()
@@ -39,26 +39,24 @@ class GameModel(nn.Module):
         p = self.p_head(x)
         x = self.pred(x)
         x = self.tanh(x)
-        
         return x, p
 
 
 class ResModel(nn.Module):
-    def __init__(self, n_pix, n_aux, n_action):
+    def __init__(self, n_pix, n_action):
         super(ResModel, self).__init__()
         self.n_pix = n_pix
-        self.n_aux = n_aux
-        self.in_shape = (n_pix, n_pix, 6) 
+        self.in_channels = 7
         self.n_action = n_action
         self.n_filters=32
         self.conv_size = self.n_filters * self.n_pix ** 2
         self.conv_in = nn.Sequential(
-            nn.Conv2d(self.in_shape, self.n_filters, kernel_size=3, padding=1),
+            nn.Conv2d(self.in_channels, self.n_filters, kernel_size=3, padding=1),
             nn.BatchNorm2d(self.n_filters),
             nn.LeakyReLU()
         )
 
-        # layers with residual
+        # residual layers
         self.conv_1 = nn.Sequential(
             nn.Conv2d(self.n_filters, self.n_filters, kernel_size=3, padding=1),
             nn.BatchNorm2d(self.n_filters),
@@ -69,21 +67,34 @@ class ResModel(nn.Module):
             nn.BatchNorm2d(self.n_filters),
             nn.LeakyReLU()
         )
+        self.conv_3 = nn.Sequential(
+            nn.Conv2d(self.n_filters, self.n_filters, kernel_size=3, padding=1),
+            nn.BatchNorm2d(self.n_filters),
+            nn.LeakyReLU()
+        )
 
         self.flatten = nn.Flatten(start_dim=1)
-        self.p_head = nn.Linear(self.conv_size + self.n_aux, actions_n)
 
-        self.pred = nn.Linear(self.conv_size + self.n_aux, 1)
+        self.policy_head = nn.Sequential(
+            nn.Conv2d(self.n_filters, 4, kernel_size=1),
+            nn.BatchNorm2d(4),
+            nn.LeakyReLU(),
+            nn.Flatten(start_dim=1), 
+            nn.Linear(self.n_action, self.n_action)
+        )
+
+        self.pred = nn.Linear(self.conv_size, 1)
         self.tanh = Tanh()
 
 
-    def forward(self, x, aux):
+    def forward(self, x):
         x = self.conv_in(x)
         x = x + self.conv_1(x)
         x = x + self.conv_2(x)
+        x = x + self.conv_3(x)
+        
+        p = self.policy_head(x)
         x = self.flatten(x)
-        x = torch.cat((x, aux), dim=1)
-
-        p = self.p_head(x)
         x = self.pred(x)
         x = self.tanh(x)
+        return x, p

@@ -20,6 +20,19 @@ def load_ref(name='ref'):
     with open(name + '.pkl', 'rb') as f:
         return pickle.load(f)
 
+def conv_features(state):
+    my_map = state.return_maps()
+    n_pix = len(my_map[0][0][0])
+    x_map = np.zeros((7, n_pix, n_pix))
+    x_map[0] = my_map[0][0]
+    x_map[1] = my_map[0][1]
+    x_map[2] = my_map[0][3]
+    x_map[3] = my_map[1][0]
+    x_map[4] = my_map[1][1]
+    x_map[5] = my_map[1][3]
+    x_map[6] = np.ones((n_pix, n_pix)) * state.to_play
+    return x_map
+
 def get_feat_nn(state):
     my_map = state.return_maps()
     summap0 = my_map[0][1] 
@@ -57,8 +70,11 @@ def get_feat_nn(state):
     return x
 
 class Replays(Dataset):
-    def __init__(self, use_old_data=False):
-        if use_old_data:
+    def __init__(self, x_func, use_data=(2)):
+        x = []
+        y = []
+        p = []
+        if 0 in use_data:
             replay_folder = 'replays_old/'
             replay_files = glob.glob(replay_folder + "game_*.pkl", recursive=True) #[:2000]
             replays = []
@@ -71,9 +87,7 @@ class Replays(Dataset):
                 except AssertionError:
                     pass
             print('number of games in dataset ', len(replays))
-            x = []
-            y = []
-            p = []
+
             for replay in replays: 
                 rep, vic = replay
                 for i, r  in enumerate(rep):
@@ -83,8 +97,9 @@ class Replays(Dataset):
                         p.append(probs.flatten())
                     if i < len(rep)-1:
                         y.append(vic)
-                        x.append(get_feat_nn(my_state))
-        else:
+                        x.append(x_func(my_state))
+        
+        if 1 in use_data:
             replay_folder = 'replays_uni/'
             replay_files_uni = glob.glob(replay_folder + "game_*.pkl", recursive=True) #[:2000]
 
@@ -107,9 +122,6 @@ class Replays(Dataset):
                 except AssertionError:
                     pass
             print('number of games in dataset ', len(replays))
-            x = []
-            y = []
-            p = []
             for replay in replays: 
                 rep, vic = replay
                 for i, r  in enumerate(rep):
@@ -118,7 +130,39 @@ class Replays(Dataset):
                     if i < len(rep)-1:
                         p.append(probs.flatten())
                         y.append(vic)
-                        x.append(get_feat_nn(my_state))
+                        x.append(x_func(my_state))
+        
+        if 2 in use_data:
+            replay_folder = 'replays_clean_mac/'
+            replay_files_uni = glob.glob(replay_folder + "game_*.pkl", recursive=True) #[:2000]
+            replay_folder = 'replays_clean/'
+            replay_files_uni1 = glob.glob(replay_folder + "game_*.pkl", recursive=True) #[:2000]
+            replay_folder = 'replays_clean2/'
+            replay_files_uni2 = glob.glob(replay_folder + "game_*.pkl", recursive=True) #[:2000]
+            replay_folder = 'replays_freak/'
+            replay_files_best1 = glob.glob(replay_folder + "game_*.pkl", recursive=True) #[:2000]
+            replay_folder = 'replays_freak2/'
+            replay_files_best2 = glob.glob(replay_folder + "game_*.pkl", recursive=True) #[:2000]
+            replay_files = replay_files_uni + replay_files_uni1 + replay_files_uni2 + replay_files_best1 + replay_files_best2
+            replays = []
+            for filename in replay_files:
+                try:
+                    with open(filename, 'rb') as f:
+                        rep, vic = pickle.load(f)
+                    assert len(rep[0]) == 3, 'data missing in replay ' + filename
+                    replays.append([rep, vic])
+                except AssertionError:
+                    pass
+            print('number of games in dataset ', len(replays))
+            for replay in replays: 
+                rep, vic = replay
+                for i, r  in enumerate(rep):
+                    my_state, action, probs = r
+                        
+                    if i < len(rep)-1:
+                        p.append(probs.flatten())
+                        y.append(vic)
+                        x.append(x_func(my_state))        
         
         assert len(x) == len(y), 'inconsistent length of data'
         self.n_samples = len(x)
@@ -147,13 +191,13 @@ if device=='cuda':
   print (torch.cuda.get_device_name(device=device))
 
 
-batch_size = 1024
+batch_size = 512
 
-dataset = Replays()
+dataset = Replays(conv_features, use_data=(2,))
 
 n_samp = len(dataset)
-n_train = int(n_samp * 0.7)
-n_val = int(n_samp * 0.2)
+n_train = int(n_samp * 0.85)
+n_val = int(n_samp * 0.1)
 n_test = n_samp - n_train - n_val
 train_data, val_data, test_data = random_split(dataset, lengths=[n_train, n_val, n_test])
 
@@ -168,11 +212,13 @@ n_feat = n_feat = 2 * n_pix ** 2 + 9
 
 # _, my_model = load_ref(name='ref_best')
 # _, my_model = load_ref(name='ref_replays_all_clean')
-my_model = model.GameModel(n_feat, n_action=4 * n_pix ** 2)
+_, my_model = load_ref(name='ref_conv_2_rat')
+# my_model = model.GameModel(n_feat, n_action=4 * n_pix ** 2)
+# my_model = model.ResModel(n_pix, n_action=4 * n_pix ** 2)
 
 lr = 0.001 #0.0005
 num_epochs = 100
-prior_weight = 2
+prior_weight = 1.5
 
 loss_fn = torch.nn.MSELoss()
 loss_p_fn = torch.nn.CrossEntropyLoss()
@@ -295,68 +341,11 @@ def save_ref(mod, name='ref'):
 test_epoch(my_model,device,test_loader,loss_fn).item()
 
 test_epoch(my_model,device,test_loader,loss_fn, True).item() # Plot losses
-# plt.figure(figsize=(10,8))
-# plt.semilogy(history['train_loss'], label='Train')
-# plt.semilogy(history['val_loss'], label='Valid')
-# plt.xlabel('Epoch')
-# plt.ylabel('Average Loss')
-# #plt.grid()
-# plt.legend()
-#plt.title('loss')
-my_model.to('cpu')
-mod = [1000, my_model]
-save_ref(mod, name='ref_replays')
-
-
-def v3(state, net):
-    x = get_feat_nn(state)
-    x = torch.tensor(x, dtype=torch.float32)
-    value, probs = net(x)
-    if state.done:
-        value = state.victory
-    return value, probs, x
-
-def compare_models(mod1, mod2, n_exp=100, ref=False, n_sim=20, temp=0.5):
-    elo1, model1 = mod1
-    elo2, model2 = mod2
-    vic = np.zeros(n_exp)
-    K = 10
-    eps = 0.1
-    for i in range(n_exp):
-        print('Playing game number: ', i + 1, ' of ', n_exp)
-        if i < n_exp // 2:
-            gm = game.Game(n_pix, 1, v3, randomize=True, rand_frac=0.2)
-            gm.mcts_vs_mcts(model1, model2, eps=eps, n_sim=n_sim, save_game=False)
-            vic[i] = (gm.state.victory + 1) * 0.5
-        else:
-            gm = game.Game(n_pix, 1, v3, randomize=True, rand_frac=0.2)
-            gm.mcts_vs_mcts(model2, model1, eps=eps, n_sim=n_sim, save_game=False)
-            vic[i] = 1 - (gm.state.victory + 1) * 0.5
-        print('Mean score: ', np.mean(vic[:(i+1)]))
-        exp1, exp2 = get_exp(elo1, elo2)
-        
-        elo1 = elo1 + K * (vic[i] - exp1)
-        if not ref:
-            elo2 = elo2 + K * ((1 - vic[i]) - exp2)
-    print('Mean score: ', np.mean(vic))
-    return elo1, elo2, np.mean(vic)
-
-
-def get_exp(e1, e2):
-    q1 = 10 ** (e1 / 400)
-    q2 = 10 ** (e2 / 400)
-    qsum = q1 + q2
-    e1 = q1 / qsum
-    e2 = q2 / qsum
-    return e1, e2 
-
-mod = [1000, my_model]
-
-
-mod2 = load_ref('ref_replays_all_clean')
-
-elo_new, _, mean_score = compare_models(mod, mod2, n_exp=200, ref=True, n_sim=10)
-
-print(mean_score)
-
-# plt.show()
+plt.figure(figsize=(10,8))
+plt.semilogy(history['train_loss'], label='Train')
+plt.semilogy(history['val_loss'], label='Valid')
+plt.xlabel('Epoch')
+plt.ylabel('Average Loss')
+plt.grid()
+plt.legend()
+plt.plot()
