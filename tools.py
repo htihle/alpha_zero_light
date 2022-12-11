@@ -7,10 +7,8 @@ import pickle
 from time import sleep
 import game.state as state
 import game.game as game
-import model
+import mcts as my_mcts
 
-import sys
-sys.setrecursionlimit(10000)
 
 def get_feat_nn(state):
     my_map = state.return_maps()
@@ -56,11 +54,6 @@ def v3(state, net):
         value = state.victory
     return value, probs, x
 
-def q(state, action):
-    newstate = copy.deepcopy(state)
-    newstate.step(action)
-    return v(newstate)
-
 def conv_features(state):
     my_map = state.return_maps()
 
@@ -84,26 +77,55 @@ def v_conv(state, net):
         value = state.victory
     return value, probs, x
 
-def load_ref(name='ref'):
+
+def get_exp(e1, e2):
+    q1 = 10 ** (e1 / 400)
+    q2 = 10 ** (e2 / 400)
+    qsum = q1 + q2
+    e1 = q1 / qsum
+    e2 = q2 / qsum
+    return e1, e2 
+
+def load_nn():
+    # loads a model 
+    filename = 'nn_3_0'
+    with open(filename + '.pkl', 'rb') as f:
+        return pickle.load(f)
+
+
+def save_ref(mod, name='ref'):
+    # saves a model (or model elo-pair)
+    with open(name + '.pkl', 'wb') as f:
+            pickle.dump(mod, f, pickle.HIGHEST_PROTOCOL)
+
+
+def load_ref(name='ref'): 
+    # loads a model (or model elo-pair)
     with open(name + '.pkl', 'rb') as f:
         return pickle.load(f)
 
-n_pix = 4
-eps = 0.0
+def compare_models(mod1, mod2, n_exp=100, ref=False, n_sim=5, temp=0.5):
 
-_, my_model = load_ref(name='ref_replays_all_clean')
-
-n_games = 10000
-for i in range(n_games):
-    my_game = game.Game(n_pix, v_conv, v_conv, randomize=True, rand_frac=0.8, random_start=True)
-    try:
-        my_game.mcts_vs_mcts(my_model, my_model, eps=eps, n_sim=150, replay_folder='replays_clean2')
-    except RecursionError:
-        print('Encountered a recursion error')
-        continue
-    replay = my_game.replay
-    victory = my_game.state.victory
-
-    n_replay = len(replay) - 1
-
-    print('length of game: ', n_replay + 1, ' score: ', victory)
+    elo1, model1, v1 = mod1
+    elo2, model2, v2 = mod2
+    vic = np.zeros(n_exp)
+    K = 10
+    eps = 0.1
+    for i in range(n_exp):
+        print('Playing game number: ', i + 1, ' of ', n_exp)
+        if i < n_exp // 2:
+            gm = game.Game(n_pix, v1, v2, randomize=True, rand_frac=0.2)
+            gm.mcts_vs_mcts(model1, model2, eps=eps, n_sim=n_sim, save_game=False)
+            vic[i] = (gm.state.victory + 1) * 0.5
+        else:
+            gm = game.Game(n_pix, v2, v1, randomize=True, rand_frac=0.2)
+            gm.mcts_vs_mcts(model2, model1, eps=eps, n_sim=n_sim, save_game=False)
+            vic[i] = 1 - (gm.state.victory + 1) * 0.5
+        print('Mean score: ', np.mean(vic[:i+1]))
+        exp1, exp2 = get_exp(elo1, elo2)
+        
+        elo1 = elo1 + K * (vic[i] - exp1)
+        if not ref:
+            elo2 = elo2 + K * ((1 - vic[i]) - exp2)
+    print('Mean score: ', np.mean(vic))
+    return elo1, elo2, np.mean(vic)
