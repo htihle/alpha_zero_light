@@ -9,9 +9,6 @@ import game.state as state
 import game.game as game
 import model
 
-import sys
-sys.setrecursionlimit(10000)
-
 
 def load_game(gameid):
     filename = 'replays/game_{0:d}'.format(gameid)

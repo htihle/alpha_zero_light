@@ -28,13 +28,8 @@ class MCTS():
         state_str = state.state2string()
 
         for i in range(n_sim):
-            # print(' ')
-            try:
-                self.find_leaf_node(state, net, root=state_str, add_noise=add_noise, n_recur=1)
-            except RecursionError:
-                print('Encountered a recursion error')
-                i -= 1
-                continue
+            self.find_leaf_node(state, net, root=state_str, add_noise=add_noise, n_recur=1)
+
             
 
         
@@ -63,9 +58,6 @@ class MCTS():
         
         state_str = state.state2string()
 
-        if n_recur > 200:
-            print('High recurrence in mcts')
-            return 0.0
         if state.done:
             # the loser has the turn (and we return - value)
             if state.to_play == 1:
@@ -127,13 +119,11 @@ class MCTS():
         val = self.find_leaf_node(new_s, net, root, n_recur+1)
         sa = state_str + ' ' + best_action_str
         if sa in self.Qsa:
-            # print(sa, val, self.Qsa[sa])
             self.Qsa[sa] = (self.Nsa[sa] * self.Qsa[sa] + val) / (self.Nsa[sa] + 1)
             self.Nsa[sa] += 1
         else:
             self.Qsa[sa] = val
             self.Nsa[sa] = 1
-            # print(sa, val)
 
         self.Ns[state_str] += 1
         return -val

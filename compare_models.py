@@ -87,7 +87,7 @@ def compare_models(mod1, mod2, n_exp=100, ref=False, n_sim=5, temp=0.5, replay_f
     elo2, model2, v2 = mod2
     vic = np.zeros(n_exp)
     K = 10
-    eps = 0.1
+    eps = 0.0
     for i in range(n_exp):
         print('Playing game number: ', i + 1, ' of ', n_exp)
         if i < n_exp // 2:
@@ -129,7 +129,7 @@ device = 'cpu'
 if device=='cuda':
   print (torch.cuda.get_device_name(device=device))
 
-mod = load_ref('ref_conv_20_lr01_50_data3')
+mod = load_ref('ref_conv_01_lr01_100_data3_4096')
 
 mod = [mod[0], mod[1], v_conv]
 
@@ -141,4 +141,4 @@ def load_ref(name='ref'):
 # mod2 = [mod2[0], mod2[1], v3]
 mod2 = load_ref('ref_conv_best')
 mod2 = [mod2[0], mod2[1], v_conv]
-elo_new, _, mean_score = compare_models(mod, mod2, n_exp=200, ref=True, n_sim=5, replay_folder='comparisons')
+elo_new, _, mean_score = compare_models(mod, mod2, n_exp=200, ref=True, n_sim=20, replay_folder='comparisons')

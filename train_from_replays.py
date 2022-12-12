@@ -172,7 +172,7 @@ if device=='cuda':
   print (torch.cuda.get_device_name(device=device))
 
 
-batch_size = 512
+batch_size = 4096
 
 dataset = Replays(tools.conv_features, use_data=(3,))  # choose whic data to include 0 to 3 with 3 being the newest
 
@@ -196,9 +196,9 @@ _, my_model = tools.load_ref(name='ref_conv_best')
 # my_model = model.GameModel(n_feat, n_action=4 * n_pix ** 2)
 # my_model = model.ResModel(n_pix, n_action=4 * n_pix ** 2)
 
-lr = 0.0005 #0.0005
-num_epochs = 100
-prior_weight = 5.0
+lr = 0.001 #0.0005
+num_epochs = 50
+prior_weight = 1.0
 
 loss_fn = torch.nn.MSELoss()
 loss_p_fn = torch.nn.CrossEntropyLoss()

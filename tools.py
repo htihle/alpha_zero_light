@@ -115,7 +115,7 @@ def compare_models(mod1, mod2, n_exp=100, ref=False, n_sim=5, temp=0.5, n_pix=4)
     elo2, model2, v2 = mod2
     vic = np.zeros(n_exp)
     K = 10
-    eps = 0.1
+    eps = 0.0
     for i in range(n_exp):
         print('Playing game number: ', i + 1, ' of ', n_exp)
         if i < n_exp // 2:
@@ -134,6 +134,12 @@ def compare_models(mod1, mod2, n_exp=100, ref=False, n_sim=5, temp=0.5, n_pix=4)
             elo2 = elo2 + K * ((1 - vic[i]) - exp2)
     print('Mean score: ', np.mean(vic))
     return elo1, elo2, np.mean(vic)
+
+
+def load_game(gameid, folder):
+    filename = folder +'/game_{0:d}'.format(gameid)
+    with open(filename + '.pkl', 'rb') as f:
+        return pickle.load(f)
 
 
 def view_replay(gameid, mod, folder='replays', sleeplen=1.5):
