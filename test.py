@@ -48,55 +48,19 @@ def get_feat_nn(state):
     x[9 + len(summap1):] = summap1 / 5
     return x
 
-def q(state, action):
-    newstate = copy.deepcopy(state)
-    newstate.step(action)
-    return v(newstate)
-
-def v(state, net):
-    x = get_feat_nn(state)
-    # print(x.shape)
-    if state.to_play == 0:
-        value = (x[0] + x[2] + x[4]/12 + x[6] * 5 - x[7] * 5 - x[1] - x[3] - x[5]/12) / 30
-        if state.done:
-            if state.victory == 0.0:  # draw
-                return 0.0, x
-            else:
-                return state.victory, x
-    if state.to_play == 1:
-        value = -(x[0] + x[2] + x[4]/12 + x[6] * 5 - x[7] * 5 - x[1] - x[3] - x[5]/12) / 30
-        if state.done:
-            if state.victory == 0.0:  # draw
-                return 0.5, x
-            else:
-                return -state.victory, x  
-    return value, x
-
-def v2(state, net):
-    x = get_feat_nn(state)
-    # print(x.shape)
-
-    value = (x[0] + x[2] + x[4]/12 + x[6] * 5 - x[7] * 5 - x[1] - x[3] - x[5]/12) / 30
-    if state.done:
-        if state.victory == 0.0:  # draw
-            return 0.0, x
-        else:
-            return state.victory, x
-
-    return value, x
 
 
 def conv_features(state):
     my_map = state.return_maps()
 
-    x_map = np.zeros((7, n_pix, n_pix))
+    x_map = np.zeros((7, state.n_pix, state.n_pix))
     x_map[0] = my_map[0][0]
     x_map[1] = my_map[0][1]
     x_map[2] = my_map[0][3]
     x_map[3] = my_map[1][0]
     x_map[4] = my_map[1][1]
     x_map[5] = my_map[1][3]
-    x_map[6] = np.ones((n_pix, n_pix)) * state.to_play
+    x_map[6] = np.ones((state.n_pix, state.n_pix)) * state.to_play
     return x_map
 
 
@@ -145,32 +109,32 @@ def view_replay(gameid, mod, folder='replays', sleeplen=1.5):
         sleep(sleeplen)
     print(victory)
 
-n_pix = 4
+state.n_pix = 4
 n_aux = 1
-n_feat = n_feat = 2 * n_pix ** 2 + 9
+n_feat = n_feat = 2 * state.n_pix ** 2 + 9
 # elo, my_model = load_ref(name='ref_conv_2_alldata_lr015_100epoch')
 # mod = [elo, my_model, v_conv]
 # view_replay(220, mod, folder='comparisons')
 
-my_game = game.Game(n_pix, v_conv, v_conv, randomize=False, rand_frac=0.5)
+my_game = game.Game(state.n_pix, v_conv, v_conv, randomize=False, rand_frac=0.5)
 
-# my_model = model.GameModel(n_feat, n_action=4 * n_pix ** 2)
+# my_model = model.GameModel(n_feat, n_action=4 * state.n_pix ** 2)
 # elo, my_model = load_ref(name='ref_replays_all_clean')
 elo, my_model = load_ref(name='ref_conv_2_alldata_lr015_100epoch')
 
-# my_model = model.ResModel(n_pix, n_action=4 * n_pix ** 2)
+# my_model = model.ResModel(state.n_pix, n_action=4 * state.n_pix ** 2)
 my_game.vs_mcts(num_sim=350, net=my_model)
 
 # my_map = my_game.state.return_maps()
 # print(my_map[0][0])
-# x_map = np.zeros((7, n_pix, n_pix))
+# x_map = np.zeros((7, state.n_pix, state.n_pix))
 # x_map[0] = my_map[0][0]
 # x_map[1] = my_map[0][1]
 # x_map[2] = my_map[0][3]
 # x_map[3] = my_map[1][0]
 # x_map[4] = my_map[1][1]
 # x_map[5] = my_map[1][3]
-# x_map[6] = np.ones((n_pix, n_pix)) * my_game.state.to_play
+# x_map[6] = np.ones((state.n_pix, state.n_pix)) * my_game.state.to_play
 # x_map = torch.tensor(x_map, dtype=torch.float32)
 # x_map = x_map.unsqueeze(0)
 # aux = torch.tensor([my_game.state.to_play], dtype=torch.float32).unsqueeze(0)
@@ -253,7 +217,7 @@ my_game.vs_mcts(num_sim=350, net=my_model)
 # value, priors = my_model(x)
 # priors = priors.detach().numpy()
 # priors = softmax(priors)
-# priors = priors.reshape(n_pix, n_pix, 4)
+# priors = priors.reshape(state.n_pix, state.n_pix, 4)
 # value = value.detach().numpy()
 # masked = priors * mask
 # print(value)
@@ -319,8 +283,8 @@ my_game.vs_mcts(num_sim=350, net=my_model)
 #                 return -state.victory, x  
 #     return value, x
 
-# n_pix = 4
+# state.n_pix = 4
 
-# my_game = game.Game(n_pix, q, v, randomize=True, rand_frac=0.9)
+# my_game = game.Game(state.n_pix, q, v, randomize=True, rand_frac=0.9)
 
 # my_game.vs_mcts(num_sim=1500)

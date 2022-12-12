@@ -129,7 +129,7 @@ device = 'cpu'
 if device=='cuda':
   print (torch.cuda.get_device_name(device=device))
 
-mod = load_ref('ref_conv_15_alldata_lr02_512_100epoch_085')
+mod = load_ref('ref_conv_20_lr01_50_data3')
 
 mod = [mod[0], mod[1], v_conv]
 
@@ -139,6 +139,6 @@ def load_ref(name='ref'):
 
 # mod2 = load_ref('ref_freak')
 # mod2 = [mod2[0], mod2[1], v3]
-mod2 = load_ref('ref_conv_15_alldata_lr015_512_100epoch')
+mod2 = load_ref('ref_conv_best')
 mod2 = [mod2[0], mod2[1], v_conv]
 elo_new, _, mean_score = compare_models(mod, mod2, n_exp=200, ref=True, n_sim=5, replay_folder='comparisons')

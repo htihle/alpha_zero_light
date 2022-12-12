@@ -10,6 +10,31 @@ import game.game as game
 import mcts as my_mcts
 
 
+def conv_features(state):
+    # defines the features for the conv/res-net
+    my_map = state.return_maps()
+
+    x_map = np.zeros((7, state.n_pix, state.n_pix))
+    x_map[0] = my_map[0][0]
+    x_map[1] = my_map[0][1]
+    x_map[2] = my_map[0][3]
+    x_map[3] = my_map[1][0]
+    x_map[4] = my_map[1][1]
+    x_map[5] = my_map[1][3]
+    x_map[6] = np.ones((state.n_pix, state.n_pix)) * state.to_play
+    return x_map
+
+
+def v_conv(state, net):
+    # function that does the inference
+    x = conv_features(state)
+    x = torch.tensor(x, dtype=torch.float32).unsqueeze(0)
+    value, probs = net(x)
+    if state.done:
+        value = state.victory
+    return value, probs, x
+
+
 def get_feat_nn(state):
     my_map = state.return_maps()
     summap0 = my_map[0][1] 
@@ -47,6 +72,7 @@ def get_feat_nn(state):
     return x
 
 def v3(state, net):
+    # inference for the fully connected net
     x = get_feat_nn(state)
     x = torch.tensor(x, dtype=torch.float32)
     value, probs = net(x)
@@ -54,31 +80,10 @@ def v3(state, net):
         value = state.victory
     return value, probs, x
 
-def conv_features(state):
-    my_map = state.return_maps()
-
-    x_map = np.zeros((7, n_pix, n_pix))
-    x_map[0] = my_map[0][0]
-    x_map[1] = my_map[0][1]
-    x_map[2] = my_map[0][3]
-    x_map[3] = my_map[1][0]
-    x_map[4] = my_map[1][1]
-    x_map[5] = my_map[1][3]
-    x_map[6] = np.ones((n_pix, n_pix)) * state.to_play
-    return x_map
-
-
-def v_conv(state, net):
-    # 
-    x = conv_features(state)
-    x = torch.tensor(x, dtype=torch.float32).unsqueeze(0)
-    value, probs = net(x)
-    if state.done:
-        value = state.victory
-    return value, probs, x
 
 
 def get_exp(e1, e2):
+    # elo calculator
     q1 = 10 ** (e1 / 400)
     q2 = 10 ** (e2 / 400)
     qsum = q1 + q2
@@ -104,8 +109,8 @@ def load_ref(name='ref'):
     with open(name + '.pkl', 'rb') as f:
         return pickle.load(f)
 
-def compare_models(mod1, mod2, n_exp=100, ref=False, n_sim=5, temp=0.5):
-
+def compare_models(mod1, mod2, n_exp=100, ref=False, n_sim=5, temp=0.5, n_pix=4):
+    # compares two models by running n_exp games with a mcts depth of n_sim
     elo1, model1, v1 = mod1
     elo2, model2, v2 = mod2
     vic = np.zeros(n_exp)
@@ -129,3 +134,22 @@ def compare_models(mod1, mod2, n_exp=100, ref=False, n_sim=5, temp=0.5):
             elo2 = elo2 + K * ((1 - vic[i]) - exp2)
     print('Mean score: ', np.mean(vic))
     return elo1, elo2, np.mean(vic)
+
+
+def view_replay(gameid, mod, folder='replays', sleeplen=1.5):
+    replay, victory = load_game(gameid, folder=folder)
+    elo, model, v = mod
+    n_turns = len(replay)
+    print(len(replay))
+    p = 0
+    for state, action, _ in replay:
+        state.visualize()
+        print(action)
+        # x = get_feat_nn(state, action)
+        val, probs, _ = v(state, model)
+        print(val)
+        # print(state.done)
+        p += 1
+        print(p)
+        sleep(sleeplen)
+    print(victory)

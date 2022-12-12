@@ -13,23 +13,25 @@ class State():
         self.turn = 0
         self.done = False
         if players is None:
+            # define starting units for the players
             self.players = [
                 [[units.Center((0, 0))], [units.Unit((0, 1))]],
                 [[units.Center((self.n_pix - 1, self.n_pix - 1))],
                  [units.Unit((self.n_pix - 1, self.n_pix - 2))]]
             ]
+            # randomly change starting conditions to increase variety
             if randomize and np.random.rand() < rand_frac:
                 for player in self.players:
                     for t in player:
                         for u in t:
                             # u.size += np.random.randint(0, 10)
                             # u.size += np.random.randint(0, 5)
-                            u.size += np.random.randint(0, 1)
-                self.players[0][1][0].position += np.random.randint(0, 2, 2)
+                            u.size += np.random.randint(0, 1)  # randomly increase starting unit size
+                self.players[0][1][0].position += np.random.randint(0, 2, 2)  # randomly move starting unit
                 self.players[1][1][0].position -= np.random.randint(0, 2, 2)
                 # self.players[0][1][0].position += np.random.randint(0, 3, 2)
                 # self.players[1][1][0].position -= np.random.randint(0, 3, 2)
-                self.players[0][0][0].res = np.random.randint(5, 10)
+                self.players[0][0][0].res = np.random.randint(5, 10)  # randomly change starting resources
                 self.players[1][0][0].res = np.random.randint(5, 10)
             # else:
             #     print('starting standard game')

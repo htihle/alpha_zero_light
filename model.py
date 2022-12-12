@@ -11,6 +11,7 @@ import numpy as np
 
 
 class GameModel(nn.Module):
+    # Fully connected model
     def __init__(self, n_in, n_action):
         super(GameModel, self).__init__()
         self.n_in = n_in
@@ -43,12 +44,13 @@ class GameModel(nn.Module):
 
 
 class ResModel(nn.Module):
+    # convolutional model with residual layers (like AlphaZero)
     def __init__(self, n_pix, n_action):
         super(ResModel, self).__init__()
         self.n_pix = n_pix
         self.in_channels = 7
         self.n_action = n_action
-        self.n_filters=32
+        self.n_filters = 32
         self.conv_size = self.n_filters * self.n_pix ** 2
         self.conv_in = nn.Sequential(
             nn.Conv2d(self.in_channels, self.n_filters, kernel_size=3, padding=1),

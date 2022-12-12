@@ -8,7 +8,7 @@ import torch
 # priors_uni = np.zeros((n_pix, n_pix,  4)) + 1.0
 
 
-c_base = 1.0
+c_base = 1.0  # hyperparameter determining the weight to put on exploration vs value of the best action
 
 class MCTS():
     def __init__(self, valuefunc):
